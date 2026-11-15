@@ -90,8 +90,14 @@ asked for in this catch-up."
             (puthash (substring line (1+ (string-search ":" line))) t table))
           (puthash key table cache)))))
 
-
 ;;;; Reconciling rows
+
+;; notmuch.el chooses whether a search hides excluded messages only from
+;; 0.39; before, it passes nothing and notmuch's default applies.
+(defun notmuch-live--exclude-args ()
+  "Return the exclusion argument this buffer's search was run with, in a list."
+  (when (boundp 'notmuch-search-hide-excluded)
+    (list (if notmuch-search-hide-excluded "--exclude=true" "--exclude=false"))))
 
 ;; A kind of list is a plist of functions:
 ;;   :rows            () -> the rows in buffer order, each (ID . START)
@@ -233,11 +239,12 @@ Return non-nil if the row point was on was taken out."
    (seq-remove
     ;; notmuch leaves these out of the list.
     (lambda (result) (eql (plist-get result :matched) 0))
-    (notmuch-call-notmuch-sexp
-     "search" "--format=sexp" "--format-version=5"
-     (if notmuch-search-oldest-first "--sort=oldest-first" "--sort=newest-first")
-     (if notmuch-search-hide-excluded "--exclude=true" "--exclude=false")
-     (format "(%s) and thread:{lastmod:%d..}" notmuch-search-query-string (1+ since))))
+    (apply #'notmuch-call-notmuch-sexp
+           "search" "--format=sexp" "--format-version=5"
+           (if notmuch-search-oldest-first "--sort=oldest-first" "--sort=newest-first")
+           `(,@(notmuch-live--exclude-args)
+             ,(format "(%s) and thread:{lastmod:%d..}"
+                      notmuch-search-query-string (1+ since)))))
    notmuch-search-oldest-first))
 
 ;;;; Unthreaded lists
@@ -285,11 +292,11 @@ Return non-nil if the row point was on was taken out."
   (notmuch-live--reconcile
    notmuch-live--message-kind
    (notmuch-live--changed "messages" since cache)
-   (notmuch-call-notmuch-sexp
-    "show" "--body=false" "--format=sexp" "--format-version=5" "--unthreaded"
-    (if notmuch-search-oldest-first "--sort=oldest-first" "--sort=newest-first")
-    (if notmuch-search-hide-excluded "--exclude=true" "--exclude=false")
-    (format "(%s) and lastmod:%d.." (notmuch-tree-get-query) (1+ since)))
+   (apply #'notmuch-call-notmuch-sexp
+          "show" "--body=false" "--format=sexp" "--format-version=5" "--unthreaded"
+          (if notmuch-search-oldest-first "--sort=oldest-first" "--sort=newest-first")
+          `(,@(notmuch-live--exclude-args)
+            ,(format "(%s) and lastmod:%d.." (notmuch-tree-get-query) (1+ since))))
    notmuch-search-oldest-first))
 
 ;;;; Catching up

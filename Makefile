@@ -1,9 +1,14 @@
 EMACS ?= emacs
-# notmuch.el is installed with the notmuch program, outside package.el.
-NOTMUCH_LISP ?= $(HOME)/.local/share/emacs/site-lisp
+
+# notmuch.el is installed with the notmuch program rather than through
+# package.el, into site-lisp under the program's prefix -- or a notmuch
+# directory there, as Termux does.  NOTMUCH_LISP names it otherwise.
+NOTMUCH_PREFIX := $(abspath $(dir $(shell command -v notmuch))/..)
+NOTMUCH_LISP ?= $(wildcard $(NOTMUCH_PREFIX)/share/emacs/site-lisp \
+	$(NOTMUCH_PREFIX)/share/emacs/site-lisp/notmuch)
 
 BATCH = $(EMACS) -Q --batch --eval '(setq load-prefer-newer t)' \
-	-L $(NOTMUCH_LISP) -L .
+	$(addprefix -L ,$(NOTMUCH_LISP)) -L .
 
 EL = $(filter-out %-autoloads.el %-pkg.el, $(wildcard *.el))
 

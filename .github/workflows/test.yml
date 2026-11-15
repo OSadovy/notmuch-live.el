@@ -1,0 +1,52 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        emacs: ['29.1', '30.2']
+        notmuch: ['0.34', '0.40']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: purcell/setup-emacs@master
+        with:
+          version: ${{ matrix.emacs }}
+
+      # Needed whether or not notmuch comes from the cache: the libraries
+      # it links against come with these.
+      - name: Install notmuch's build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxapian-dev libgmime-3.0-dev libtalloc-dev zlib1g-dev
+
+      # notmuch.el is compiled by the Emacs that builds it, hence the key.
+      - name: Cache notmuch
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/notmuch
+          key: notmuch-${{ matrix.notmuch }}-emacs-${{ matrix.emacs }}-ubuntu-24.04
+
+      - name: Build notmuch ${{ matrix.notmuch }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL https://notmuchmail.org/releases/notmuch-${{ matrix.notmuch }}.tar.xz | tar -xJ
+          cd notmuch-${{ matrix.notmuch }}
+          ./configure --prefix="$HOME/notmuch" --without-docs --without-api-docs \
+            --without-ruby --without-bash-completion --without-zsh-completion \
+            --without-desktop
+          make -j"$(nproc)"
+          make install
+
+      - name: Compile and test
+        run: |
+          export PATH="$HOME/notmuch/bin:$PATH" LD_LIBRARY_PATH="$HOME/notmuch/lib"
+          notmuch --version
+          make compile test

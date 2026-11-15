@@ -18,7 +18,8 @@
 ;; drives notmuch.el's real lists and tagging against it, through the
 ;; timer that catches lists up.  Not tested: catching up when a list is
 ;; shown again (needs redisplay), the start page, and a database replaced
-;; under a list.
+;; under a list.  The last test checks that the parts of notmuch.el used
+;; outside its documented interface are still there.
 
 ;;; Code:
 
@@ -91,7 +92,9 @@ MESSAGES are argument lists for `notmuch-live-test--write'."
 
 (defun notmuch-live-test--search (query)
   "Open the thread list for QUERY in the selected window and return it."
-  (notmuch-search query notmuch-search-oldest-first nil nil nil t)
+  ;; notmuch.el takes whether to hide excluded mail from 0.39.
+  (apply #'notmuch-search query notmuch-search-oldest-first
+         (if (boundp 'notmuch-search-hide-excluded) '(nil nil nil t) '(nil nil t)))
   (let ((buffer (current-buffer)))
     (set-window-buffer (selected-window) buffer)
     (notmuch-live-test--settle)
@@ -299,5 +302,27 @@ MESSAGES are argument lists for `notmuch-live-test--write'."
       (notmuch-live-test--settle)
       (with-current-buffer list
         (should (equal (notmuch-live-test--subjects) '("Alpha" "Bravo" "Charlie")))))))
+
+;; Renamed or removed in an upgrade, these would break catching up while
+;; every list still looked as notmuch drew it.
+(ert-deftest notmuch-live-test-notmuch-internals ()
+  (dolist (function '(notmuch--process-lines
+                      notmuch-call-notmuch-sexp
+                      notmuch-search-get-result
+                      notmuch-search-result-end
+                      notmuch-search-show-result
+                      notmuch-search-process-sentinel
+                      notmuch-tree-insert-forest-thread
+                      notmuch-tree-get-query
+                      notmuch-refresh-this-buffer))
+    (should (fboundp function)))
+  (dolist (variable '(notmuch-search-query-string
+                      notmuch-search-oldest-first
+                      notmuch-tree-unthreaded
+                      notmuch-tree-target-msg
+                      notmuch-tree-previous-subject
+                      notmuch-after-tag-hook
+                      notmuch-hello-refresh-hook))
+    (should (boundp variable))))
 
 ;;; notmuch-live-tests.el ends here
