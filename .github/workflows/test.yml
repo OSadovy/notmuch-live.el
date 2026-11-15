@@ -13,7 +13,7 @@ jobs:
         emacs: ['29.1', '30.2']
         notmuch: ['0.34', '0.40']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: purcell/setup-emacs@master
         with:
@@ -29,7 +29,7 @@ jobs:
       # notmuch.el is compiled by the Emacs that builds it, hence the key.
       - name: Cache notmuch
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/notmuch
           key: notmuch-${{ matrix.notmuch }}-emacs-${{ matrix.emacs }}-ubuntu-24.04
